@@ -1,11 +1,13 @@
 """
-START: 1:47 pm
-***What I have so far at 2:24 pm***
+START: 1:47 pm - 2:24 pm
 
 Design a food-delivery order service
 
+CONTINUE: 2:34 pm - 3:05 pm (I was a bit dosed off, and main time blocker
+was figuring out how to map orders and customer_ids together)
+
 important variables/classes to make:
-- dictionary (customer_orders) where order_id -> `Order` object
+- dictionary (active_orders) where order_id -> `Order` object
 - create a class called `Order` that contains the following info:
     - order_id (int)
     - customer_id (int)
@@ -32,6 +34,8 @@ get_orders_by_customer(customer_id) -> list[str]
 
 """
 
+from collections import defaultdict
+
 class Order:
     def __init__(self, order_id, customer_id, items, driver_id=-1, status=""):
         self.order_id = order_id
@@ -47,19 +51,23 @@ class Order:
 class Doordash:
     def __init__(self):
         self.order_counter = 1
-        self.customer_orders = {}
+        self.active_orders = {}
+        self.customer_orders = defaultdict(list)  # map customer id to their list of order ids
 
     def create_order(self, customer_id: int, items: list[str]) -> None:
-        new_order = Order(self.order_counter, customer_id, )
+        new_order = Order(self.order_counter, customer_id, items)
+        self.active_orders[new_order.order_id] = new_order
+        self.customer_orders[new_order.customer_id].append(new_order.order_id)
+        self.order_counter += 1
 
-    def assign_driver(order_id: int, driver_id: int):
-        pass
+    def assign_driver(self, order_id: int, driver_id: int) -> None:
+        self.active_orders[order_id].driver_id = driver_id
 
-    def update_status(order_id: int, new_status):
-        pass
+    def update_status(self, order_id: int, new_status: str) -> None:
+        self.active_orders[order_id] = new_status
 
-    def get_orders_by_customer(customer_id) -> list[str]:
-        pass
+    def get_orders_by_customer(self, customer_id: int) -> list[str]:
+        return [self.active_orders[order_id] for order_id in self.customer_orders[customer_id]]
 
 
 
