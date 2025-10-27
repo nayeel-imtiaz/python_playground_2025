@@ -6,6 +6,8 @@ Design a food-delivery order service
 CONTINUE: 2:34 pm - 3:05 pm (I was a bit dosed off, and main time blocker
 was figuring out how to map orders and customer_ids together)
 
+CONTINUE: 3:11 - 3:48 (here i am testing the code i wrote (just create_order())
+
 important variables/classes to make:
 - dictionary (active_orders) where order_id -> `Order` object
 - create a class called `Order` that contains the following info:
@@ -36,8 +38,9 @@ get_orders_by_customer(customer_id) -> list[str]
 
 from collections import defaultdict
 
+
 class Order:
-    def __init__(self, order_id, customer_id, items, driver_id=-1, status=""):
+    def __init__(self, order_id, customer_id, items, driver_id=-1, status="order placed"):
         self.order_id = order_id
         self.customer_id = customer_id
         self.items = items
@@ -54,14 +57,16 @@ class Doordash:
         self.active_orders = {}
         self.customer_orders = defaultdict(list)  # map customer id to their list of order ids
 
-    def create_order(self, customer_id: int, items: list[str]) -> None:
+    def create_order(self, customer_id: int, items: list[str]) -> int:
         new_order = Order(self.order_counter, customer_id, items)
         self.active_orders[new_order.order_id] = new_order
         self.customer_orders[new_order.customer_id].append(new_order.order_id)
         self.order_counter += 1
+        return new_order.order_id
 
     def assign_driver(self, order_id: int, driver_id: int) -> None:
         self.active_orders[order_id].driver_id = driver_id
+        self.active_orders[order_id].status = "driver assigned"
 
     def update_status(self, order_id: int, new_status: str) -> None:
         self.active_orders[order_id] = new_status
@@ -70,5 +75,24 @@ class Doordash:
         return [self.active_orders[order_id] for order_id in self.customer_orders[customer_id]]
 
 
+def test_create_order():
+    doordash = Doordash()
+
+    order_id1 = doordash.create_order(100, ["bulgogi", "boba"])
+    assert len(doordash.active_orders) == 1, f"Expected: 1, Actual: {len(doordash.active_orders)}"
+    actual = [
+               doordash.active_orders[order_id1].order_id,
+               doordash.active_orders[order_id1].customer_id,
+               doordash.active_orders[order_id1].items,
+               doordash.active_orders[order_id1].driver_id,
+               doordash.active_orders[order_id1].status
+           ]
+    expected = [order_id1, 100, ["bulgogi", "boba"], -1, "order placed"]
+    assert actual == expected, f"Expected: {expected}, Actual: {actual}"
+
+def main():
+    test_create_order()
 
 
+if __name__ == '__main__':
+    main()
