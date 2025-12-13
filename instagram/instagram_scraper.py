@@ -1,11 +1,12 @@
 import json
 import csv
 from pathlib import Path
+from typing import Iterable
 
 
 class InstagramScraper:
     @staticmethod
-    def scrape_followers(followers_file_name: Path) -> set:
+    def _scrape_followers(followers_file_name: Path) -> set:
         with open(followers_file_name) as followers_json_file:
             json_followers_data = json.load(followers_json_file)
             followers_set = set()
@@ -14,7 +15,7 @@ class InstagramScraper:
             return followers_set
 
     @staticmethod
-    def scrape_following(following_file_name: Path) -> set:
+    def _scrape_following(following_file_name: Path) -> set:
         with open(following_file_name) as json_file:
             json_following_data = json.load(json_file)
             following_set = set()
@@ -23,23 +24,51 @@ class InstagramScraper:
             return following_set
 
     @staticmethod
-    def scrape_not_following_you_back(followers_file_name: Path, following_file_name: Path) -> set:
+    def _compute_not_following_you_back(followers_file_name: Path, following_file_name: Path) -> set:
         return (
-                InstagramScraper.scrape_following(following_file_name)
-                - InstagramScraper.scrape_followers(followers_file_name)
+                InstagramScraper._scrape_following(following_file_name)
+                - InstagramScraper._scrape_followers(followers_file_name)
         )
 
     @staticmethod
-    def output_not_following_you_back(
-            followers_file_name: Path,
-            following_file_name: Path,
-            output_file_name: Path
-    ) -> None:
-        not_following_you_back_set = InstagramScraper.scrape_not_following_you_back(
-            followers_file_name,
-            following_file_name
+    def _compute_recent_not_following_you_back(
+            followers_file_name_old_timestamp: Path,
+            following_file_name_old_timestamp: Path,
+            followers_file_name_new_timestamp: Path,
+            following_file_name_new_timestamp: Path
+    ):
+        return (
+                InstagramScraper._compute_not_following_you_back(
+                    followers_file_name_new_timestamp,
+                    following_file_name_new_timestamp
+                ) -
+                InstagramScraper._compute_not_following_you_back(
+                    followers_file_name_old_timestamp,
+                    following_file_name_old_timestamp
+                )
         )
-        with open(output_file_name, 'w') as file:
-            writer = csv.writer(file)
+
+    @staticmethod
+    def _write_rows(rows: Iterable[tuple[str, str]], output_file: Path) -> None:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
             writer.writerow(["username", "link"])
-            writer.writerows(sorted(not_following_you_back_set))
+            writer.writerows(sorted(rows))
+
+    # Public API
+    @staticmethod
+    def output_not_following_you_back(followers_file: Path, following_file: Path, output_file: Path) -> None:
+        rows = InstagramScraper._compute_not_following_you_back(followers_file, following_file)
+        InstagramScraper._write_rows(rows, output_file)
+
+    @staticmethod
+    def output_recent_not_following_you_back(
+        followers_old: Path, following_old: Path,
+        followers_new: Path, following_new: Path,
+        output_file: Path
+    ) -> None:
+        rows = InstagramScraper._compute_recent_not_following_you_back(
+            followers_old, following_old, followers_new, following_new
+        )
+        InstagramScraper._write_rows(rows, output_file)
