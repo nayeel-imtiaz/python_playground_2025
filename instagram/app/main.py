@@ -18,7 +18,6 @@ def resolve_data_files(base_dir: Path, date_str: str):
 
 def ensure_files_exist_or_fallback(logger, base_dir: Path, date_str: str, fallback_date: str):
     followers, following = resolve_data_files(base_dir, date_str)
-
     if followers.exists() and following.exists():
         return date_str, followers, following
 
@@ -27,18 +26,35 @@ def ensure_files_exist_or_fallback(logger, base_dir: Path, date_str: str, fallba
     return fallback_date, followers, following
 
 
+def ensure_followers_exist_or_fallback(logger, base_dir: Path, date_str: str, fallback_date: str):
+    followers, _following = resolve_data_files(base_dir, date_str)
+    if followers.exists():
+        return date_str, followers
+
+    logger.warning(f"Followers file for {date_str} not found — falling back to {fallback_date}.")
+    followers, _ = resolve_data_files(base_dir, fallback_date)
+    return fallback_date, followers
+
+
 def main():
     logger = setup_logger()
-
     base_dir = Path(instagram.__file__).resolve().parent
+
     output_dir = base_dir / "output" / "instagram_scraper_output"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Instagram scraper started.")
 
-    mode = input("Choose mode: [A]ll not-following-back or [R]ecent since reference date (default A): ").strip().lower()
-    if mode not in {"a", "r", ""}:
-        logger.warning("Invalid mode. Defaulting to All.")
+    mode = input(
+        "Choose mode:\n"
+        "  [A] All not-following-back (snapshot)\n"
+        "  [R] Recent not-following-back (delta)\n"
+        "  [U] Recent unfollowers (followers_old - followers_new)\n"
+        "Default: A\n> "
+    ).strip().lower()
+
+    if mode not in {"a", "r", "u", ""}:
+        logger.warning("Invalid mode. Defaulting to A.")
         mode = "a"
     if mode == "":
         mode = "a"
@@ -55,7 +71,7 @@ def main():
 
         InstagramScraper.output_not_following_you_back(followers, following, results)
 
-    else:  # mode == "r"
+    elif mode == "r":
         new_date = input(f"Enter NEW date (MM-DD-YY), default [{DEFAULT_NEW_DATE}]: ").strip() or DEFAULT_NEW_DATE
         ref_date = input(f"Enter REFERENCE (old) date (MM-DD-YY), default [{DEFAULT_REFERENCE_DATE}]: ").strip() or DEFAULT_REFERENCE_DATE
 
@@ -76,9 +92,52 @@ def main():
             results
         )
 
+    else:
+        new_date = input(f"Enter NEW date (MM-DD-YY), default [{DEFAULT_NEW_DATE}]: ").strip() or DEFAULT_NEW_DATE
+        ref_date = input(f"Enter REFERENCE (old) date (MM-DD-YY), default [{DEFAULT_REFERENCE_DATE}]: ").strip() or DEFAULT_REFERENCE_DATE
+
+        new_date, followers_new = ensure_followers_exist_or_fallback(logger, base_dir, new_date, DEFAULT_NEW_DATE)
+        ref_date, followers_old = ensure_followers_exist_or_fallback(logger, base_dir, ref_date, DEFAULT_REFERENCE_DATE)
+
+        results = output_dir / f"{ref_date}_to_{new_date}_recent_unfollowers.csv"
+
+        logger.info(f"Using NEW followers file: {followers_new}")
+        logger.info(f"Using REF followers file: {followers_old}")
+        logger.info(f"Output will be saved to: {results}")
+
+        InstagramScraper.output_recent_unfollowers(followers_old, followers_new, results)
+
     logger.info("Scraping complete.")
     logger.info("Done.")
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

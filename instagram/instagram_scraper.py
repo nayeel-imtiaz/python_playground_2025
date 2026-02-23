@@ -49,6 +49,16 @@ class InstagramScraper:
         )
 
     @staticmethod
+    def _compute_recent_unfollowers(
+        followers_file_name_old_timestamp: Path,
+        followers_file_name_new_timestamp: Path
+    ) -> set:
+        return (
+            InstagramScraper._scrape_followers(followers_file_name_old_timestamp)
+            - InstagramScraper._scrape_followers(followers_file_name_new_timestamp)
+        )
+
+    @staticmethod
     def _write_rows(rows: Iterable[tuple[str, str]], output_file: Path) -> None:
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w", newline="", encoding="utf-8") as f:
@@ -71,4 +81,13 @@ class InstagramScraper:
         rows = InstagramScraper._compute_recent_not_following_you_back(
             followers_old, following_old, followers_new, following_new
         )
+        InstagramScraper._write_rows(rows, output_file)
+
+    @staticmethod
+    def output_recent_unfollowers(
+        followers_old: Path,
+        followers_new: Path,
+        output_file: Path
+    ) -> None:
+        rows = InstagramScraper._compute_recent_unfollowers(followers_old, followers_new)
         InstagramScraper._write_rows(rows, output_file)
