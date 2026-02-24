@@ -107,16 +107,15 @@ Time:
 Space: O(3600 + distinct keys in last hour)
 '''
 from collections import defaultdict
-import time
 from typing import Optional
 
 class TimeStamp:
     def __init__(self, timestamp: int):
         self.timestamp = timestamp
         self.global_counter = 0
-        self.event_counts = defaultdict(int)
-        self.tenant_counts = defaultdict(int)
-        self.event_tenant_counts = defaultdict(int)
+        self.event_counter = defaultdict(int)
+        self.tenant_counter = defaultdict(int)
+        self.event_tenant_counter = defaultdict(int)
 
 
 class EventCounter:
@@ -128,38 +127,35 @@ class EventCounter:
             self.array_ring[timestamp % 3600] = TimeStamp(timestamp)
 
         self.array_ring[timestamp % 3600].global_counter += 1
-        self.array_ring[timestamp % 3600].event_counts[eventType] += 1
-        self.array_ring[timestamp % 3600].tenant_counts[tenantId] += 1
-        self.array_ring[timestamp % 3600].event_tenant_counts[(eventType, tenantId)] += 1
+        self.array_ring[timestamp % 3600].event_counter[eventType] += 1
+        self.array_ring[timestamp % 3600].tenant_counter[tenantId] += 1
+        self.array_ring[timestamp % 3600].event_tenant_counter[(eventType, tenantId)] += 1
 
-
-    def count_last(self, timestamp: int, windowSec: int, eventType: Optional[str], tenantId: Optional[str]) -> int:
-        begin_time_index = (timestamp - windowSec + 1) % 3600
-        end_time_index = timestamp % 3600
-        event_count = 0
-        for time_index in range(begin_time_index, end_time_index + 1):
+    def count_last(self, timestamp: int, windowSec: int, eventType: Optional[str] = None, tenantId: Optional[str] = None) -> int:
+        start_time = timestamp - windowSec + 1
+        event_counter = 0
+        for current_time in range(start_time, start_time + windowSec):
+            if self.array_ring[current_time % 3600].timestamp != current_time:
+                continue
             if eventType and tenantId:
-                event_count += self.array_ring[time_index].event_tenant_counts[(eventType, tenantId)]
+                event_counter += self.array_ring[current_time % 3600].event_tenant_counter[(eventType, tenantId)]
             elif eventType:
-                event_count += self.array_ring[time_index].event_counts[eventType]
+                event_counter += self.array_ring[current_time % 3600].event_counter[eventType]
             elif tenantId:
-                event_count += self.array_ring[time_index].tenant_counts[tenantId]
+                event_counter += self.array_ring[current_time % 3600].tenant_counter[tenantId]
             else:
-                event_count += self.array_ring[time_index].global_counter
-        return event_count
+                event_counter += self.array_ring[current_time % 3600].global_counter
+        return event_counter
 
-start = time.time()
-print(f"program start: {start}")
 
 event_counter = EventCounter()
-for _ in range(700):
-    event_counter.record(timestamp=int(time.time()), eventType="page_view", tenantId="snowflake_customer")
-for _ in range(500):
-    event_counter.record(timestamp=int(time.time()), eventType="api_call", tenantId="snowflake_customer")
+for current_time in range(1, 701):
+    event_counter.record(timestamp=current_time, eventType="page_view", tenantId="snowflake_customer")
+    if current_time % 100 == 0:
+        event_counter.record(timestamp=current_time, eventType="api_call", tenantId="snowflake_customer")
 
-print(event_counter.count_last(timestamp=int(time.time()), windowSec=0, eventType="page_view", tenantId="snowflake_customer")) # 700
-print(event_counter.count_last(timestamp=int(time.time()), windowSec=20, eventType="api_call", tenantId="snowflake_customer")) # 500
-
-end = time.time()
-print(f"program end: {end}")
-print(f"took {end - start} seconds")
+print(event_counter.count_last(timestamp=700, windowSec=700, eventType=None, tenantId=None)) # 707
+print(event_counter.count_last(timestamp=700, windowSec=20, eventType=None, tenantId=None)) # 21
+print(event_counter.count_last(timestamp=700, windowSec=20, eventType="api_call", tenantId="snowflake_customer")) # 1
+print(event_counter.count_last(timestamp=700, windowSec=20, eventType="api_call", tenantId="apple_customer")) # 0
+print(event_counter.count_last(timestamp=700, windowSec=3600, eventType="page_view")) # 700
